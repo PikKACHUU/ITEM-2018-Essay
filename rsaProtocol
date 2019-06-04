@@ -1,0 +1,170 @@
+import socket
+import time
+import random
+import hmac
+import sys
+import rsa.key
+
+from hashlib import sha256
+from time import clock
+from Crypto.Cipher import AES
+from binascii import b2a_hex, a2b_hex
+from Crypto.Hash import MD5
+
+def align(str, isKey=False):
+    # 如果接受的字符串是密码，需要确保其长度为16
+    if isKey:
+        if len(str) > 16:
+            return str[0:16]
+                else:
+                    return align(str)
+                # 如果接受的字符串是明文或长度不足的密码，则确保其长度为16的整数倍
+                else:
+                    zerocount = 16-len(str) % 16
+                    for i in range(0, zerocount):
+                        str = str + '\0'
+                            return str
+
+
+# CBC模式加密
+def encrypt_CBC(str, key):
+    # 补全字符串
+    str = align(str)
+    key = align(key, True)
+    # 初始化AES，引入初始向量
+    AESCipher = AES.new(key, AES.MODE_CBC, '1234567890123456')
+    # 加密
+    cipher = AESCipher.encrypt(str)
+    return b2a_hex(cipher)
+    
+    
+    
+    
+    # CBC模式解密
+def decrypt_CBC(str, key):
+        # 补全字符串
+    key = align(key, True)
+        # 初始化AES
+    AESCipher = AES.new(key, AES.MODE_CBC, '1234567890123456')
+        # 解密
+    paint = AESCipher.decrypt(a2b_hex(str))
+    return paint
+    
+    key=parse_hex("68b329da9893e34099c7d8ad5cb9c940")
+
+
+
+
+
+
+if __name__== '__main__':
+    #constant value
+    HOST = '10.8.80.55'
+    PORT = 6632
+    C_ID = '00000001'
+    SDF_HELLO_C = 'hello_c'
+    FEATURE_REQUEST = 'feature_request'
+    
+    SK_C = rsa.PrivateKey(8257803095818186703083652958772973457557594003973444574318843332182994547106774656685692183634768510801274253715607020857079634125466353938848361374188897, 65537, 875336956324655431684729803082164984812435807949761500492744627136964815081236864964890083262612754266642492580651495066576996719357188639971327108595713, 4717395006280520237915102560653651014716525529706242677846889273716540095323417441, 1750500665054364082237309573206918394536721995288723607946822320359676417)
+    PK_C = rsa.PublicKey(8257803095818186703083652958772973457557594003973444574318843332182994547106774656685692183634768510801274253715607020857079634125466353938848361374188897, 65537)
+    #Client(D) 
+    PK_D = rsa.PublicKey(8120821809744727155701413468461400370794214251227023894936112683009881867726026058128783249649400749170083731158390949447839553410331573231783873953023309, 65537)
+
+    print('Begin')
+
+    #TCP link
+    s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    #s.setblocking(1) #blocking model
+    s.bind((HOST,PORT))
+
+    print('Listen to connecting...')
+    nu= -1
+    s.listen(5)
+
+    # while receiving M1
+    try:
+        while True:
+            connection,address = s.accept()
+            print('Connected. Got connection from ',address)
+		    #print('%s:%s connect' %client_addr) 
+            
+
+            while True:
+                clientStr = connection.recv(1024)
+                length = len(clientStr)
+                #print "length:", length
+                #print 'nu:', nu
+
+                print("message from client: " + clientStr)
+
+                if nu == 1:
+                    #receive msg4
+                    print 'receive msg4'
+                    FEATURE_REPLY_EN = clientStr.split(',')[0]
+                    SIG_D = clientStr.split(',')[1]
+                    FEATURE_REPLY = rsa.decrypt(FEATURE_REPLY_EN , SK_C)
+                    v_message = SDF_HELLO_D + nonceND + D_ID + SDF_HELLO_C + str(nonceNC) + C_ID + FEATURE_REQUEST + FEATURE_REPLY
+                    v_message_en =
+                    # verify signature D
+                    rsa.verify(v_message, SIG_D, PK_D)
+
+                    #calculate K
+                    kString = str(nonceNC) + str(nonceND)
+                    hmach = hmac.new(TMK,'',sha256)
+                    hmach.update(kString)
+                    K = hmach.hexdigest()
+
+                    #print K
+                    print 'K:', K
+                    nu = 0
+                    break
+
+                #4 receive M1
+                elif nu == 0:
+
+			        # Server side
+                    # generate random number NC
+                    #print "random number NC"
+                    nonceNC = random.randint(10000000,999999999)
+                    print 'nonceNC:', nonceNC
+
+                    #. Send msg2 to Client(D)
+                    msg2 = SDF_HELLO_C + ',' + str(nonceNC) + ',' + C_ID
+                    print 'msg2:', msg2
+                    connection.send(msg2)
+
+                    #receive msg1
+                    SDF_HELLO_D = clientStr.split(',')[0]
+                    nonceND = clientStr.split(',')[1]
+                    D_ID= clientStr.split(',')[2]
+
+                    TMK = str(random.randint(10000000,999999999))
+                    TMK_EN = rsa.encrypt(TMK, PK_D)
+                    FEATURE_REQUEST_EN = rsa.encrypt(FEATURE_REQUEST, PK_D)
+                          
+                    # calculate signature
+                    signString = SDF_HELLO_D + nonceND + D_ID + SDF_HELLO_C + str(nonceNC) + C_ID + FEATURE_REQUEST
+                    SIG_C = rsa.sign(signString, SK_C, 'SHA-256')
+                    print 'SIG_C:', SIG_C
+
+				    #. Send msg3 to Client(D)
+                    msg3 = FEATURE_REQUEST_EN + ',' + TMK_EN + ',' + SIG_C
+                    time.sleep(0.1)
+                    connection.send(msg3)
+                    nu = 1
+                    print 'msg3 nu:', nu
+                    continue
+                        elif nu == -1:
+                            PK_D = data
+                            connection.send(PK_C)
+                            nu = 0
+                            continue
+                else:
+                    print 'End'
+                    pass
+		    print 'over'
+            break
+    except KeyboardInterrupt:
+        s.close()
+        print 'KeyboardInterrupt'
+        sys.exit(0)
